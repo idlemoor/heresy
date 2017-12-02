@@ -1,6 +1,7 @@
-# This file is part of etcslacker http://github.com/idlemoor/etcslacker
+# This file is part of heresy_etc
+# http://github.com/idlemoor/heresy_etc
 #
-# Copyright 2015 David Spencer, Baildon, West Yorkshire, U.K.
+# Copyright 2017 David Spencer, Baildon, West Yorkshire, U.K.
 # All rights reserved.
 #
 # Redistribution and use of this script, with or without modification, is
@@ -21,24 +22,31 @@
 #  ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 #-------------------------------------------------------------------------------
-# zzz_etcslacker.sh
+#
+# zzz_heresy_etc.sh
+#
 # Replaces these functions in slackpkg's post-functions.sh
 #   looknew
 # Adds these functions
-#   es_cachesync
-#   es_merge_all
-#   es_merge
+#   he_copy_to_repo
+#   he_merge_all
+#   he_merge
+#
 #-------------------------------------------------------------------------------
 
-CONF=${CONF:-/etc/slackpkg}
-if [ -e "$CONF"/etcslacker.conf ]; then
-  . "$CONF"/etcslacker.conf
+H_CONFDIR=${H_CONFDIR:-/etc/slackpkg}
+if [ -e "$H_CONFDIR"/heresy_etc.conf ]; then
+  . "$H_CONFDIR"/heresy_etc.conf
 fi
+
+H_STATEDIR=${H_STATEDIR:-/var/lib/heresy}
+H_ETC_REPO="$H_STATEDIR"/etc
+[ -d "$H_ETC_REPO" ] || mkdir -p "$H_ETC_REPO"
 
 #-------------------------------------------------------------------------------
 
 looknew()
-# etcslacker version of slackpkg's looknew.
+# heresy_etc version of slackpkg's looknew.
 {
 	# with ONLY_NEW_DOTNEW set, slackpkg will search only for
 	# .new files installed in actual slackpkg's execution
@@ -60,7 +68,7 @@ looknew()
 Some packages had new configuration files installed.
 You have five choices:
 
-  (M)erge the new files with etcslacker
+  (M)erge the new files with heresy_etc
 
 	(K)eep the old files and consider .new files later
 
@@ -75,7 +83,7 @@ What do you want (M/K/O/R/P)?"
 		answer	
 		case $ANSWER in
 			M|m)
-				es_merge_all
+				he_merge_all
 				break
 			;;
 			K|k)
@@ -114,7 +122,7 @@ What do you want (M/K/O/R/P)?"
 								showdiff $1
 							;;
 							M|m)
-								es_merge $1
+								he_merge $1
 							;;
 							K|k|*)
 								GOEX=1
@@ -135,41 +143,48 @@ What do you want (M/K/O/R/P)?"
 
 #-------------------------------------------------------------------------------
 
-es_cachesync()
-# Copy "safe" files and links from /etc to /var/cache/etc
+he_copy_to_repo()
+# Copy "safe" files and links from /etc to $H_ETC_REPO and optionally commit
+# $1 - optional commit message; no message => no commit
 {
   find /etc/ -depth -user root -group root \
     -type d \! -perm 755 -prune \
     -o \( \( -type f \( -perm 755 -o -perm 644 \) \) -o -type l \) \
     -print0 2>/dev/null | \
-    rsync -rlpgoc --delete --exclude='.*' --from0 --files-from=- / /var/cache/etc/
+    rsync -rlpgoc --delete --exclude='.*' --from0 --files-from=- / "$H_ETC_REPO"/
+  if [ -n "${1:-}" ]; then
+    cd "$H_ETC_REPO"
+    if [ -n "$(git status -s .)" ]; then
+      git add .
+      git commit -m "$1"
+    fi
+    cd - >/dev/null
+  fi
   return 0
 }
 
 #-------------------------------------------------------------------------------
 
-es_merge_all()
+he_merge_all()
 {
   hostbranch="$(cat /etc/HOSTNAME)"
 
   # If we have no repo, clone it from upstream or create it from /etc
-  if [ ! -d /var/cache/etc/.git ]; then
-    rm -rf /var/cache/etc
-    mkdir -p /var/cache/etc
-    if [ -n "$ETC_UPSTREAM" ]; then
-      git clone "$ETC_UPSTREAM" /var/cache/etc/
+  if [ ! -d "$H_ETC_REPO"/.git ]; then
+    rm -rf "$H_ETC_REPO"
+    mkdir -p "$H_ETC_REPO"
+    if [ -n "$H_ETC_UPSTREAM" ]; then
+      git clone "$H_ETC_UPSTREAM" "$H_ETC_REPO"
     else
-      git init /var/cache/etc
-      cd /var/cache/etc
+      git init "$H_ETC_REPO"
+      cd "$H_ETC_REPO"
       echo "*.new" > .gitignore
-      es_cachesync
-      git add .
-      git commit -m "Initialise repository on $hostbranch"
+      he_copy_to_repo "Initialise repository on $hostbranch"
     fi
   fi
 
-  # If we have no hostbranch, create it, else sync the cache and commit
-  cd /var/cache/etc
+  # If we have no hostbranch, create it, else sync the repo and commit
+  cd "$H_ETC_REPO"
   if [ "$(git branch --list "$hostbranch")" = '' ]; then
     if [ "$(git branch --list origin/"$hostbranch")" = '' ]; then
       git checkout -b "$hostbranch" master
@@ -178,19 +193,15 @@ es_merge_all()
     fi
   else
     git checkout "$hostbranch"
-    es_cachesync
-    if [ -n "$(git status -s .)" ]; then
-      git add .
-      git commit -m 'Commit manual changes since last merge'
-    fi
+    he_copy_to_repo 'Commit manual changes since last merge'
   fi
 
   ####
   # if master has an upstream, pull it.
-  # if [ "$ETC_PULL" = "yes" ] || [ "$ETC_PULL" = "force" ]; then
+  # if [ "$H_ETC_PULL" = "yes" ] || [ "$H_ETC_PULL" = "force" ]; then
   #   git fetch --all
   #   git checkout master
-  #   if [ "$ETC_PULL" = 'force' ]; then
+  #   if [ "$H_ETC_PULL" = 'force' ]; then
   #     git merge origin/master
   #   else
   #     git merge origin/master
@@ -213,7 +224,7 @@ es_merge_all()
 
   # Merge master into the host branch.
   git checkout "$hostbranch"
-  git merge master
+  git rebase master
   if [ -n "$(git ls-files --abbrev --unmerged)" ]; then
     git mergetool
     #### give the user a chance to bail out here and leave /etc unchanged
@@ -221,7 +232,7 @@ es_merge_all()
   fi
 
   # Copy back to /etc.
-  rsync -rlpgoc --exclude='.*' /var/cache/etc/ /etc/
+  rsync -rlpgoc --exclude='.*' "$H_ETC_REPO"/ /etc/
   for configfile in $newfiles ; do
     rm /etc/$configfile
   done
