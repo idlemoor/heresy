@@ -1,0 +1,122 @@
+#!/bin/sh
+# This file is part of the Heresy Plugins
+# http://github.com/idlemoor/heresy
+#
+# Copyright 2017 David Spencer, Baildon, West Yorkshire, U.K.
+# All rights reserved.
+#
+# Redistribution and use of this script, with or without modification, is
+# permitted provided that the following conditions are met:
+#
+# 1. Redistributions of this script must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+#
+#  THIS SOFTWARE IS PROVIDED BY THE AUTHOR "AS IS" AND ANY EXPRESS OR IMPLIED
+#  WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+#  MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO
+#  EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+#  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+#  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
+#  OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+#  WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+#  OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
+#  ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#
+#===============================================================================
+#
+# /usr/sbin/remakepkg
+#
+# Reconstruct a Slackware package from the running system and the saved metadata
+# in /var/log/packages and /var/log/scripts
+#
+# removepkg -copy is an alternative, but this script outputs a complete package,
+# including (for rollback purposes) the current version of config files in /etc.
+#
+#===============================================================================
+
+[ -n "$1" ] || { echo "Usage: remakepkg [--quiet|-q] [/var/log/packages/]pkgname..." >&2; exit 0; }
+
+TMP="${TMP:-$(mktemp -d -p /tmp remakepkg.XXXXXX)}"
+OUTPUT="${OUTPUT:-/tmp}"
+mkdir -p "$OUTPUT"
+EXTRATAG="${EXTRATAG:-_remakepkg}"
+
+if [ "$1" = '-q' ] || [ "$1" = '--quiet' ]; then
+  QUIET='>/dev/null 2>&1'
+  shift
+fi
+
+while [ "${1:-}" != '' ]; do
+
+  arg=$(basename ${1%.t?z})
+  shift
+
+  if [ -f /var/log/packages/"$arg" ]; then
+    # exact match!
+    pkgnam="$arg"
+  else
+    # we want exactly one installed package
+    pkgnam=""
+    for pkgpath in $(find /var/log/packages/"$arg"* -type f -maxdepth 0 2>/dev/null); do
+      trypkg=$(basename $pkgpath)
+      trybase="$(echo "$trypkg" | rev | cut -f4- -d- | rev)"
+      if [ "$trybase" = "$arg" ]; then
+        [ -z "$pkgnam" ] || { echo "remakepkg: /var/log/packages is broken: $arg" >&2; exit 5; }
+        pkgnam="$trypkg"
+      fi
+    done
+    [ -n "$pkgnam" ] || { echo "remakepkg: Package is not installed: $arg" >&2; exit 4; }
+  fi
+
+  PKG=$TMP/package-"$pkgnam"
+  mkdir -p $PKG/install
+  cd $PKG
+
+  csplit --quiet --prefix $TMP/meta /var/log/packages/"$pkgnam" \
+    '/^PACKAGE LOCATION:/' \
+    '/^PACKAGE DESCRIPTION:$/' \
+    '/^FILE LIST:$/'
+  pkgtype=$(head -1 $TMP/meta01 | sed 's/.*\.//')
+  tail -1 $TMP/meta02 > $PKG/install/slack-desc
+  grep -v -E '^FILE LIST:|^\./$|^install|^etc\/.*\.new$' $TMP/meta03 | \
+    sed -e 's:^:/:' | \
+    cpio -pdm --quiet $PKG 2>/dev/null
+  grep '^etc\/.*\.new$' $TMP/meta03 | \
+    while read config; do
+      mkdir -p $PKG/$(dirname "$config")
+      if [ -f /"$config" ]; then
+        cp -a /"$config" $PKG/"$config"
+      elif [ -f /"${config%.new}" ]; then
+        cp -a /"${config%.new}" $PKG/"$config"
+      fi
+    done
+  rm $TMP/meta*
+
+  if [ -f /var/log/scripts/"$pkgnam" ]; then
+    cp -a /var/log/scripts/"$pkgnam" $PKG/install/doinst.sh
+  fi
+
+  # If the current installed package is already tagged with EXTRATAG,
+  # we don't want to add *another* EXTRATAG on the end :)
+  case "$pkgnam" in
+  *"$EXTRATAG") 
+    ADDTAG='' ;;
+  *)
+    ADDTAG="$EXTRATAG" ;;
+  esac
+
+  eval \
+    XZ_OPT="--threads=0" \
+    /sbin/makepkg -l y -c n "${OUTPUT}"/"${pkgnam}${ADDTAG}.${PKGTYPE:-$pkgtype}" $QUIET \
+    || exit $?
+
+  cd - >/dev/null
+  rm -rf $PKG
+
+done
+
+rmdir $TMP
+
+exit 0
+
+#===============================================================================

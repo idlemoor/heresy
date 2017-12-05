@@ -1,0 +1,96 @@
+#!/bin/sh
+# This file is part of the Heresy Plugins
+# http://github.com/idlemoor/heresy
+#
+# Copyright 2017 David Spencer, Baildon, West Yorkshire, U.K.
+# All rights reserved.
+#
+# Redistribution and use of this script, with or without modification, is
+# permitted provided that the following conditions are met:
+#
+# 1. Redistributions of this script must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+#
+#  THIS SOFTWARE IS PROVIDED BY THE AUTHOR "AS IS" AND ANY EXPRESS OR IMPLIED
+#  WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+#  MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO
+#  EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+#  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+#  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
+#  OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+#  WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+#  OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
+#  ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#
+#===============================================================================
+#
+# /usr/sbin/rollbackpkg
+#
+#===============================================================================
+
+H_STATEDIR=${H_STATEDIR:-/var/lib/slackpkg/heresy}
+H_ROLLBACK_REPO="$H_STATEDIR"/rollback
+[ -d "$H_ROLLBACK_REPO" ] || { echo "You have no saved packages." >&2; exit 1; }
+
+#-------------------------------------------------------------------------------
+
+while [ "${1:-}" != '' ]; do
+
+  arg=$(basename $1)
+  shift
+
+  if [ -f /var/log/packages/"$arg" ]; then
+    # exact match!
+    prgnam="$arg | rev | cut -f4- -d- | rev)"
+  else
+    # we want exactly one installed package
+    pkgnam=""
+    for pkgpath in $(find /var/log/packages/"$arg"* -type f -maxdepth 0 2>/dev/null); do
+      trypkgnam=$(basename $pkgpath)
+      tryprgnam="$(echo "$trypkgnam" | rev | cut -f4- -d- | rev)"
+      if [ "$tryprgnam" = "$arg" ]; then
+        [ -z "$pkgnam" ] || { echo "remakepkg: /var/log/packages is broken: $1" >&2; exit 5; }
+        pkgnam="$trypkg"
+      fi
+    done
+    [ -n "$pkgnam" ] || { echo "remakepkg: Package is not installed: $1" >&2; exit 4; }
+  fi
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  arg=$(basename $1)
+  shift
+
+  for pkg in $(find "$H_ROLLBACK_REPO"/"$arg"* -type f -mindepth 0 -maxdepth 0); do
+    pkgbase=
+
+
+  done
+
+  [ -n "$match" ] || { echo "Invalid package name: $1" >&2; continue; }
+
+  [ "$H_LOG_ENABLED" = 'yes' ] && hl_start "$match" rollback
+  upgradepkg --reinstall "$match"
+  [ "$H_LOG_ENABLED" = 'yes' ] && hl_finish "$match" rollback
+
+done
+
+exit 0
+
+#===============================================================================
