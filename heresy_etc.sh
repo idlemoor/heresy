@@ -35,7 +35,7 @@
 #===============================================================================
 
 H_STATEDIR="${H_STATEDIR:-/var/lib/slackpkg/heresy}"
-H_ETC_REPO="${H_STATEDIR}/etc"
+H_ETC_REPO="${H_STATEDIR}/etc-repo"
 H_EXCLUDES="${H_EXCLUDES:-${H_CONFDIR}/heresy-excludes.conf}"
 
 #-------------------------------------------------------------------------------
@@ -44,10 +44,37 @@ function he_init()
 {
   if [ ! -d "$H_ETC_REPO" ]; then
     mkdir -p "$H_ETC_REPO"
-    tar xf /usr/share/slackpkg/heresy/etc-master-$SLKARCH.tar.gz -C "$H_ETC_REPO"
-    (cd "$H_ETC_REPO"; git checkout -b $(hostname) master)
+    cd "$H_ETC_REPO"
+    SLKVER=$(sed -e 's/.* //' < /etc/slackware-version)
+    MARCH=$(uname -m)
+    case "$MARCH" in
+      i386|i486|i586|i686)
+        case "$SLKVER" in
+          12*|13*|14.0|14.1)
+            SLKARCH="i486" ;;
+          *)
+            SLKARCH="i586" ;;
+        esac
+        ;;
+      *)
+        SLKARCH="$MARCH"
+        ;;
+    esac
+    mastertar="/usr/share/slackpkg/heresy/etc-master-$SLKVER-$SLKARCH.tar.gz"
+    if [ -f "$mastertar" ]; then
+      tar xf "$mastertar"
+    else
+      # improvise :(
+      he_to_repo
+      newfiles=$(find . -name '*.new')
+      for configfile in $newfiles ; do
+        mv "$configfile" "${configfile%.new}"
+      done
+      git init
+      git commit -m 'Initialise master from /etc'
+    fi
+    git checkout -b $(hostname) master
   fi
-  he_update_hostbranch
   return 0
 }
 
@@ -57,18 +84,20 @@ function he_to_repo()
 {
   nameargs="${1:-}"
   excludeargs="--exclude='.git/'"
-  [ -f "$H_EXCLUDES" ] && excludeargs="$excludeargs --exclude-from=\"$H_EXCLUDES\""
+  if [ -n "$H_EXCLUDES" ] && [ -f "$H_EXCLUDES" ]; then
+    excludeargs="$excludeargs --exclude-from=\"$H_EXCLUDES\""
+  fi
   find /etc/ \
     $nameargs \
     -depth -user root -group root \
     -type d \! -perm 755 -prune \
     -o \
     \( \( -type f \( -perm 755 -o -perm 644 \) \) -o -type l \) \
-    -print0 2>/dev/null \
+    -print 2>/dev/null \
   | \
-  rsync -rlpgoc --delete \
+  rsync -rlpgocv --delete \
     $excludeargs \
-    --from0 --files-from=- \
+    --files-from=- \
     / "$H_ETC_REPO"/
   return 0
 }
@@ -78,13 +107,12 @@ function he_to_repo()
 function he_update_hostbranch()
 {
   cd "$H_ETC_REPO"
-    git checkout $(hostname)
-    he_to_repo "! -name '*.new'"
-    if [ -n "$(git status -s .)" ]; then
-      git add .
-      git commit -m 'Updated from /etc'
-    fi
-  cd - >/dev/null
+  git checkout $(hostname)
+  he_to_repo "! -name '*.new'"
+  if [ -n "$(git status -s .)" ]; then
+    git add .
+    git commit -m 'Updated from /etc'
+  fi
   return 0
 }
 
@@ -93,17 +121,17 @@ function he_update_hostbranch()
 function he_update_master()
 {
   cd "$H_ETC_REPO"
-    git checkout master
-    he_to_repo "-name '*.new'"
-    newfiles=$(find . -name '*.new')
-    for configfile in $newfiles ; do
-      mv "$configfile" "${configfile%.new}"
-    done
-    if [ -n "$(git status -s .)" ]; then
-      git add .
-      git commit -m 'Updated master from /etc/'
-    fi
-  cd - >/dev/null
+  git checkout master
+  he_to_repo "-name '*.new'"
+  newfiles=$(find . -name '*.new')
+  for configfile in $newfiles ; do
+    mv "$configfile" "${configfile%.new}"
+  done
+  if [ -n "$(git status -s .)" ]; then
+    git add .
+    git commit -m 'Updated master from /etc/'
+  fi
+  return 0
 }
 
 #-------------------------------------------------------------------------------
@@ -114,10 +142,10 @@ function he_merge()
   git checkout $(hostname)
   git rebase master
   find /etc -name '*.new' -delete
-  unmerged=$(git ls-files --abbrev --unmerged)
+  unmerged=$(git ls-files --abbrev --unmerged etc/)
   if [ "$BATCH" = 'off' ] && [ -n "$unmerged" ]; then
     git mergetool
-    unmerged=$(git ls-files --abbrev --unmerged)
+    unmerged=$(git ls-files --abbrev --unmerged etc/)
     if [ -z "$unmerged" ]; then
       git add .
       git commit -m "Rebase $hostbranch for merged .new files"
@@ -135,10 +163,9 @@ function he_merge()
     done
     git checkout $(hostname)
   fi
-  rsync -rlpgoc \
+  rsync -rlpgocv \
     --exclude='.git' \
-    "$H_ETC_REPO"/ /etc/
-  cd - >/dev/null
+    "$H_ETC_REPO"/etc/ /etc/
   return 0
 }
 

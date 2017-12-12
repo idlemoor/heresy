@@ -26,7 +26,8 @@
 # heresy_log.sh
 #
 # Defines these functions
-#   h_log
+#   hl_start
+#   hl_finish
 #
 #===============================================================================
 
@@ -35,38 +36,33 @@ mkdir -p "$(dirname "$H_LOGFILE")"
 
 #-------------------------------------------------------------------------------
 
-function h_log()
+function hl_start()
 {
-  if [ "$1" = 'start' ]; then
-    H_LOG_PKG="$3"
-  elif [ "$1" = 'finish' ]; then
-    case "$2" in
-      installpkg|upgradepkg)
-        if [ -f /var/log/packages/"$3" ]; then
-          echo "$(date --rfc-3339=seconds) $2 $1 ok" >> "$H_LOGFILE"
-        else
-          echo "$(date --rfc-3339=seconds) $2 $1 failed" >> "$H_LOGFILE"
-        fi
-      removepkg)
-        if [ -f /var/log/packages/"$3" ]; then
-          echo "$(date --rfc-3339=seconds) $2 $1 failed" >> "$H_LOGFILE"
-        else
-          echo "$(date --rfc-3339=seconds) $2 $1 ok" >> "$H_LOGFILE"
-        fi
-      
-      *)
-    esac
-
-
-  echo "$(date --rfc-3339=seconds) $2 $1 start" >> "$H_LOGFILE"
+  #### not implemented, do we actually need this?
   return 0
 }
 
-#-------------------------------------------------------------------------------
-
 function hl_finish()
 {
-  echo "$(date --rfc-3339=seconds) $2 $1 finish" >> "$H_LOGFILE"
+  operation="$1"
+  long_pkgnam="${2%.t?z}"
+  case "$operation" in
+    installpkg|upgradepkg)
+      if [ -f /var/log/packages/"$long_pkgnam" ]; then
+        echo "$(date --rfc-3339=seconds) $operation $long_pkgnam ok" >> "$H_LOGFILE"
+      else
+        echo "$(date --rfc-3339=seconds) $operation $long_pkgnam failed" >> "$H_LOGFILE"
+      fi
+      ;;
+    removepkg)
+      if [ -f /var/log/packages/"$package" ]; then
+        echo "$(date --rfc-3339=seconds) $operation $long_pkgnam failed" >> "$H_LOGFILE"
+      else
+        echo "$(date --rfc-3339=seconds) $operation $long_pkgnam ok" >> "$H_LOGFILE"
+      fi
+      ;;
+    *) : ;;
+  esac
   return 0
 }
 

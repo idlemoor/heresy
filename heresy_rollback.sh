@@ -1,5 +1,3 @@
-#!/bin/sh
-#
 # This file is part of the Heresy Plugins
 # http://github.com/idlemoor/heresy
 #
@@ -25,30 +23,34 @@
 #
 #===============================================================================
 #
-# /usr/sbin/heresy_unattended
-# Unattended update for Slackware, using slackpkg and (optionally) slackpkgplus
+# heresy_rollback.sh
+#
+# Adds these functions
+#   hr_save
+#   hr_purge
 #
 #===============================================================================
 
-H_CONFDIR=${H_CONFDIR:-/etc/slackpkg}
-if [ -e "$H_CONFDIR"/heresy.conf ]; then
-  . "$H_CONFDIR"/heresy.conf
-fi
-
-H_LOGFILE=${H_LOGFILE:-/var/log/slackpkg/unattended.log}
-mkdir -p "$(dirname "$H_LOGFILE")"
+H_STATEDIR=${H_STATEDIR:-/var/lib/slackpkg/heresy}
+H_ROLLBACK_REPO="$H_STATEDIR"/rollback
+[ -d "$H_ROLLBACK_REPO" ] || mkdir -p "$H_ROLLBACK_REPO"
 
 #-------------------------------------------------------------------------------
 
-#### refuse to run if kernels not blacklisted
+function hr_save()
+{
+  echo "Saving $1"
+  OUTPUT="$H_ROLLBACK_REPO" \
+  EXTRATAG='_rollback' \
+  remakepkg --quiet "$(echo ${1%.t?z} | rev | cut -f4- -d- | rev)"
+  return 0
+}
 
-#-------------------------------------------------------------------------------
-
-if [ "$H_UNATTENDED_ENABLED" = 'yes' ]; then
-  postinst='off'
-  [ "$H_ETC_ENABLED" = 'yes' ] && postinst='on'
-  slackpkg -batch=on update >>"$H_LOGFILE" 2>&1
-  slackpkg -batch=on -default_answer=y -postinst=$postinst upgrade-all >>"$H_LOGFILE" 2>&1
-fi
+function hr_purge()
+{
+  #### remove any previously saved version
+  #### not yet implemented
+  return 0
+}
 
 #===============================================================================

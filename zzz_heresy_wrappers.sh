@@ -47,11 +47,13 @@ if [ "$H_ETC_ENABLED" = 'yes' ]; then
   eval "s_$(declare -f looknew)"
   function looknew()
   {
+    set -x ####
     he_init
     he_update_hostbranch
     he_update_master
     he_merge
     s_looknew "$@"
+    set +x ####
     return 0
   }
 fi
@@ -80,7 +82,7 @@ if [ "$H_LOG_ENABLED" = 'yes' ] || [ "$H_ROLLBACK_ENABLED" = 'yes' ]; then
 
   function heresy_pkg_start()
   {
-    [ "$H_LOG_ENABLED" = 'yes' ] && hl_start "$2"
+    [ "$H_LOG_ENABLED" = 'yes' ] && hl_start "$1" "$2"
     if [ "$1" = 'upgradepkg' ] || [ "$1" = 'removepkg' ]; then
       [ "$H_ROLLBACK_ENABLED" = 'yes' ] && hr_save "$2"
     fi
@@ -92,7 +94,7 @@ if [ "$H_LOG_ENABLED" = 'yes' ] || [ "$H_ROLLBACK_ENABLED" = 'yes' ]; then
     if [ "$1" = 'upgradepkg' ]; then
       [ "$H_ROLLBACK_ENABLED" = 'yes' ] && hr_purge "$2"
     fi
-    [ "$H_LOG_ENABLED" = 'yes' ] && hl_finish "$2"
+    [ "$H_LOG_ENABLED" = 'yes' ] && hl_finish "$1" "$2"
     return 0
   }
 
