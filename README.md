@@ -1,5 +1,4 @@
-# This software is INCOMPLETE and HIGHLY EXPERIMENTAL and NOT YET READY
-and POTENTIALLY TOXIC
+# This software is INCOMPLETE and HIGHLY EXPERIMENTAL and NOT YET READY and POTENTIALLY TOXIC
 
 # Heresy Plugins for slackpkg
 
@@ -45,7 +44,7 @@ By design, heresy_etc is almost entirely unlike etckeeper:
 
 * heresy_etc considers any object with unusual permissions or ownership
 to potentially be security-sensitive, and absolutely refuses to track it
-* the repository is in /var/cache/slackpkg/heresy/etc (/etc itself is
+* the repository is in /var/lib/slackpkg/heresy/etc-repo (/etc itself is
 not a git repo)
 * only git is supported
 
@@ -80,7 +79,7 @@ it is upgraded. Please note, this makes slackpkg slower and uses a lot
 of disk space. You can only rollback packages that have been upgraded
 by slackpkg when heresy_rollback is installed and enabled.
 
-*IMPORTANT* Before doing a major upgrade with slackpkg (for example,
+**IMPORTANT** Before doing a major upgrade with slackpkg (for example,
 from Slackware 14.2 to -current or 15.0), you should probably disable
 heresy_rollback, and then re-enable it after the major upgrade is
 finished.

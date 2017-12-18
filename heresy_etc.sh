@@ -42,9 +42,9 @@ H_EXCLUDES="${H_EXCLUDES:-${H_CONFDIR}/heresy-excludes.conf}"
 
 function he_init()
 {
-  if [ ! -d "$H_ETC_REPO" ]; then
-    mkdir -p "$H_ETC_REPO"
-    cd "$H_ETC_REPO"
+  if [ ! -d "${H_ETC_REPO}/.git" ]; then
+    mkdir -p "${H_ETC_REPO}"
+    cd "${H_ETC_REPO}"
     SLKVER=$(sed -e 's/.* //' < /etc/slackware-version)
     MARCH=$(uname -m)
     case "$MARCH" in
@@ -61,16 +61,20 @@ function he_init()
         ;;
     esac
     mastertar="/usr/share/slackpkg/heresy/etc-master-$SLKVER-$SLKARCH.tar.gz"
-    if [ -f "$mastertar" ]; then
-      tar xf "$mastertar"
+    if [ -f "${mastertar}" ]; then
+      tar xf "${mastertar}"
+      git init
+      git add . >/dev/null
+      git commit -m 'Initialise master'
     else
       # improvise :(
       he_to_repo
       newfiles=$(find . -name '*.new')
-      for configfile in $newfiles ; do
-        mv "$configfile" "${configfile%.new}"
+      for configfile in ${newfiles} ; do
+        mv "${configfile}" "${configfile%.new}"
       done
       git init
+      git add . >/dev/null
       git commit -m 'Initialise master from /etc'
     fi
     git checkout -b $(hostname) master
@@ -84,21 +88,22 @@ function he_to_repo()
 {
   nameargs="${1:-}"
   excludeargs="--exclude='.git/'"
-  if [ -n "$H_EXCLUDES" ] && [ -f "$H_EXCLUDES" ]; then
-    excludeargs="$excludeargs --exclude-from=\"$H_EXCLUDES\""
+  if [ -n "${H_EXCLUDES}" ] && [ -f "${H_EXCLUDES}" ]; then
+    excludeargs="${excludeargs} --exclude-from=\"${H_EXCLUDES}\""
   fi
   find /etc/ \
-    $nameargs \
-    -depth -user root -group root \
+    -depth \
+    -user root -group root \
     -type d \! -perm 755 -prune \
     -o \
     \( \( -type f \( -perm 755 -o -perm 644 \) \) -o -type l \) \
+    ${nameargs} \
     -print 2>/dev/null \
   | \
   rsync -rlpgocv --delete \
-    $excludeargs \
+    ${excludeargs} \
     --files-from=- \
-    / "$H_ETC_REPO"/
+    / "${H_ETC_REPO}"/
   return 0
 }
 
@@ -106,7 +111,7 @@ function he_to_repo()
 
 function he_update_hostbranch()
 {
-  cd "$H_ETC_REPO"
+  cd "${H_ETC_REPO}"
   git checkout $(hostname)
   he_to_repo "! -name '*.new'"
   if [ -n "$(git status -s .)" ]; then
@@ -120,12 +125,12 @@ function he_update_hostbranch()
 
 function he_update_master()
 {
-  cd "$H_ETC_REPO"
+  cd "${H_ETC_REPO}"
   git checkout master
   he_to_repo "-name '*.new'"
   newfiles=$(find . -name '*.new')
-  for configfile in $newfiles ; do
-    mv "$configfile" "${configfile%.new}"
+  for configfile in ${newfiles} ; do
+    mv "${configfile}" "${configfile%.new}"
   done
   if [ -n "$(git status -s .)" ]; then
     git add .
@@ -138,34 +143,34 @@ function he_update_master()
 
 function he_merge()
 {
-  cd "$H_ETC_REPO"
+  cd "${H_ETC_REPO}"
   git checkout $(hostname)
   git rebase master
   find /etc -name '*.new' -delete
   unmerged=$(git ls-files --abbrev --unmerged etc/)
-  if [ "$BATCH" = 'off' ] && [ -n "$unmerged" ]; then
+  if [ "${BATCH}" = 'off' ] && [ -n "${unmerged}" ]; then
     git mergetool
     unmerged=$(git ls-files --abbrev --unmerged etc/)
-    if [ -z "$unmerged" ]; then
+    if [ -z "${unmerged}" ]; then
       git add .
-      git commit -m "Rebase $hostbranch for merged .new files"
+      git commit -m "Rebase ${hostbranch} for merged .new files"
     fi
   fi
-  if [ -n "$unmerged" ]; then
-    for renew in $unmerged; do
-      git checkout -f "$renew"
+  if [ -n "${unmerged}" ]; then
+    for renew in ${unmerged}; do
+      git checkout -f "${renew}"
     done
     git add .
-    git commit -m "Partial rebase $hostbranch for merged .new files"
+    git commit -m "Partial rebase ${hostbranch} for merged .new files"
     git checkout master
-    for renew in $unmerged; do
-      cp -a "$renew" /etc/"$renew".new
+    for renew in ${unmerged}; do
+      cp -a "${renew}" "/etc/${renew}.new"
     done
     git checkout $(hostname)
   fi
   rsync -rlpgocv \
     --exclude='.git' \
-    "$H_ETC_REPO"/etc/ /etc/
+    "${H_ETC_REPO}/etc/" /etc/
   return 0
 }
 

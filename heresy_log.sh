@@ -31,8 +31,8 @@
 #
 #===============================================================================
 
-H_LOGFILE=${H_LOGFILE:-/var/log/slackpkg/slackpkg.log}
-mkdir -p "$(dirname "$H_LOGFILE")"
+HL_LOGFILE=${HL_LOGFILE:-/var/log/slackpkg/slackpkg.log}
+mkdir -p "$(dirname "${HL_LOGFILE}")"
 
 #-------------------------------------------------------------------------------
 
@@ -46,19 +46,19 @@ function hl_finish()
 {
   operation="$1"
   long_pkgnam="${2%.t?z}"
-  case "$operation" in
+  case "${operation}" in
     installpkg|upgradepkg)
-      if [ -f /var/log/packages/"$long_pkgnam" ]; then
-        echo "$(date --rfc-3339=seconds) $operation $long_pkgnam ok" >> "$H_LOGFILE"
+      if [ -f /var/log/packages/"${long_pkgnam}" ]; then
+        echo "$(date --rfc-3339=seconds) [${CMD}] ${operation} ${long_pkgnam} ok" >> "${HL_LOGFILE}"
       else
-        echo "$(date --rfc-3339=seconds) $operation $long_pkgnam failed" >> "$H_LOGFILE"
+        echo "$(date --rfc-3339=seconds) [${CMD}] ${operation} ${long_pkgnam} failed" >> "${HL_LOGFILE}"
       fi
       ;;
     removepkg)
-      if [ -f /var/log/packages/"$package" ]; then
-        echo "$(date --rfc-3339=seconds) $operation $long_pkgnam failed" >> "$H_LOGFILE"
+      if [ -f /var/log/packages/"${package}" ]; then
+        echo "$(date --rfc-3339=seconds) [${CMD}] ${operation} ${long_pkgnam} failed" >> "${HL_LOGFILE}"
       else
-        echo "$(date --rfc-3339=seconds) $operation $long_pkgnam ok" >> "$H_LOGFILE"
+        echo "$(date --rfc-3339=seconds) [${CMD}] ${operation} ${long_pkgnam} ok" >> "$HL_LOGFILE"
       fi
       ;;
     *) : ;;

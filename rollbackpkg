@@ -28,9 +28,6 @@
 #
 #===============================================================================
 
-H_STATEDIR=${H_STATEDIR:-/var/lib/slackpkg/heresy}
-H_ROLLBACK_REPO="$H_STATEDIR"/rollback
-[ -d "$H_ROLLBACK_REPO" ] || { echo "You have no saved packages." >&2; exit 1; }
 
 #-------------------------------------------------------------------------------
 

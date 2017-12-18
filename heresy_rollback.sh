@@ -28,28 +28,60 @@
 # Adds these functions
 #   hr_save
 #   hr_purge
+# Overrides these variables in /etc/slackpkg.conf
+#   DELALL=on --> DELALL=off
 #
 #===============================================================================
 
-H_STATEDIR=${H_STATEDIR:-/var/lib/slackpkg/heresy}
-H_ROLLBACK_REPO="$H_STATEDIR"/rollback
-[ -d "$H_ROLLBACK_REPO" ] || mkdir -p "$H_ROLLBACK_REPO"
+if [ "${DELALL}" = 'on' ]; then
+  echo "heresy_rollback: Forcing DELALL=on to DELALL=off"
+  echo "heresy_rollback: You can edit /etc/slackpkg.conf to make this message go away."
+  echo ""
+  DELALL='off'
+fi
+
+declare -A HR_SAVEPKGDIR HR_SAVEPKGNAM
 
 #-------------------------------------------------------------------------------
 
 function hr_save()
 {
-  echo "Saving $1"
-  OUTPUT="$H_ROLLBACK_REPO" \
-  EXTRATAG='_rollback' \
-  remakepkg --quiet "$(echo ${1%.t?z} | rev | cut -f4- -d- | rev)"
+  longpkgnam="${1/%.t[blxg]z/}"
+  PKGNAME=( $(grep -m 1 -- "[[:space:]]${longpkgnam}[[:space:]]" ${TMPDIR}/pkglist) )
+	NAMEPKG=${PKGNAME[5]}.${PKGNAME[7]}
+	FULLPATH=${PKGNAME[6]}
+	CACHEPATH=${TEMP}/${FULLPATH}
+	[ -d "${CACHEPATH}" ] || mkdir -p "${CACHEPATH}"
+
+  shortpkgnam=$(cutpkg "$longpkgnam")
+  oldlongpkgnam=$(ls /var/log/packages | grep -m1 -e "^${shortpkgnam}-[^-]\+-[^-]\+-[^-]\+$")
+  HR_SAVEPKGDIR[${shortpkgnam}]="${CACHEPATH}"
+  HR_SAVEPKGNAM[${shortpkgnam}]="${oldlongpkgnam}"
+  if [ -n "${oldlongpkgnam}" ]; then
+    oldpkg=$(find "${CACHEPATH}" -name "${oldlongpkgnam}.t?z" 2>/dev/null)
+    if [ -z "$oldpkg" ]; then
+      echo -e "\tSaving ${oldlongpkgnam}_rollback.txz..."
+      OUTPUT="${CACHEPATH}" \
+      EXTRATAG='_rollback' \
+      remakepkg --quiet "${shortpkgnam}"
+      HR_SAVEPKGNAM[${shortpkgnam}]="${oldlongpkgnam}_rollback"
+    fi
+  fi
   return 0
 }
 
 function hr_purge()
 {
-  #### remove any previously saved version
-  #### not yet implemented
+  longpkgnam="${1/%.t[blxg]z/}"
+  shortpkgnam=$(cutpkg "${longpkgnam}")
+  find "${HR_SAVEPKGDIR[${shortpkgnam}]}" -type f -name "${shortpkgnam}*" | \
+    grep -e "^${shortpkgnam}-[^-]\+-[^-]\+-[^-]\+$" | \
+    while read savefilename; do
+      n="${savefilename/%.t[blxg]z/}"
+      if [ "$n" != "${longpkgnam}" ] && [ "$n" != "${HR_SAVEPKGNAM[${shortpkgnam}]}" ]; then
+        rm -f "${savefilename}" "${savefilename}.asc"
+      fi
+    done
   return 0
 }
 

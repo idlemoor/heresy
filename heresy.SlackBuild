@@ -59,17 +59,17 @@ find -L . \
 install -D -m0755 zzz_heresy_wrappers.sh \
   $PKG/usr/libexec/slackpkg/functions.d/zzz_heresy_wrappers.sh
 install -D -m0644 heresy.conf \
-  $PKG/etc/slackpkg/heresy.conf
+  $PKG/etc/slackpkg/heresy.conf.new
 
 # heresy_etc
-install -d -m0755 $PKG/var/lib/slackpkg/heresy/etc
+install -d -m0755 $PKG/var/lib/slackpkg/heresy/etc-repo
 install -D -m0755 heresy_etc.sh \
   $PKG/usr/libexec/slackpkg/functions.d/heresy_etc.sh
 install -D -m0644 heresy-excludes.conf \
-  $PKG/etc/slackpkg/heresy-excludes.conf
-install -d -m0755 $PKG/usr/share/slackpkg
+  $PKG/etc/slackpkg/heresy-excludes.conf.new
+install -d -m0755 $PKG/usr/share/slackpkg/heresy
 install -m0644 etc-*.tar.gz \
-  $PKG/usr/share/slackpkg
+  $PKG/usr/share/slackpkg/heresy
 
 # heresy_installdeps
 
@@ -79,7 +79,6 @@ install -D -m0755 heresy_log.sh \
   $PKG/usr/libexec/slackpkg/functions.d/heresy_log.sh
 
 # heresy_rollback
-install -d -m0755 $PKG/var/lib/slackpkg/heresy/rollback
 install -D -m0755 heresy_rollback.sh \
   $PKG/usr/libexec/slackpkg/functions.d/heresy_rollback.sh
 install -D -m0755 remakepkg \
@@ -97,6 +96,7 @@ cat $PRGNAM.SlackBuild > $PKG/usr/doc/$PRGNAM-$VERSION/$PRGNAM.SlackBuild
 
 mkdir -p $PKG/install
 cat slack-desc > $PKG/install/slack-desc
+cat doinst.sh > $PKG/install/doinst.sh
 
 cd $PKG
 /sbin/makepkg -l y -c n $OUTPUT/$PRGNAM-$VERSION-$ARCH-$BUILD$TAG.${PKGTYPE:-tgz}
